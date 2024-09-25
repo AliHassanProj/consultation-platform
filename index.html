@@ -52,6 +52,7 @@
     
     <h2>Join a Video Call</h2>
     <input type="text" id="roomInput" placeholder="Enter room name" />
+    <input type="text" id="displayName" placeholder="Enter your display name" />
     <button id="joinButton">Join Call</button>
     
     <h2>Manage Clients</h2>
@@ -66,8 +67,13 @@
         // Join a video call
         document.getElementById('joinButton').onclick = function() {
             const roomName = document.getElementById('roomInput').value.trim();
+            const displayName = document.getElementById('displayName').value.trim();
             if (!roomName) {
                 alert('Please enter a room name.');
+                return;
+            }
+            if (!displayName) {
+                alert('Please enter your display name.');
                 return;
             }
 
@@ -79,7 +85,9 @@
                 parentNode: document.getElementById('jitsi-meet'),
                 configOverwrite: {
                     startWithAudioMuted: true,
-                    startWithVideoMuted: true
+                    startWithVideoMuted: true,
+                    prejoinPageEnabled: false,
+                    disableDeepLinking: true
                 },
                 interfaceConfigOverwrite: {
                     TOOLBAR_BUTTONS: [
@@ -90,10 +98,21 @@
                         'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
                         'e2ee'
                     ],
+                    SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar'],
+                    SHOW_JITSI_WATERMARK: false,
+                },
+                userInfo: {
+                    displayName: displayName
                 }
             };
 
             const api = new JitsiMeetExternalAPI(domain, options);
+
+            // Listen for videoConferenceJoined event
+            api.addEventListener('videoConferenceJoined', () => {
+                // Make the local participant a moderator
+                api.executeCommand('setRole', 'moderator');
+            });
         };
 
         // Save client data
