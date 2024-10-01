@@ -3,27 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scheduled Video Call</title>
+    <title>Simple Video Call</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         #videos { display: flex; justify-content: center; }
         video { width: 300px; height: 225px; margin: 10px; background: #ddd; }
-        #controls { margin: 20px 0; }
+        #roomControls { margin: 20px 0; }
         #status { margin-top: 20px; text-align: left; padding: 10px; background: #f0f0f0; }
-        #scheduler { margin-bottom: 20px; }
     </style>
 </head>
 <body>
-    <h1>Scheduled Video Call</h1>
-    <div id="scheduler">
-        <h2>Schedule a Consultation</h2>
-        <input type="date" id="dateInput">
-        <input type="time" id="timeInput">
-        <input type="email" id="clientEmail" placeholder="Client Email">
-        <button onclick="scheduleConsultation()">Generate Link</button>
-    </div>
-    <div id="controls">
-        <input type="text" id="roomInput" placeholder="Enter room code">
+    <h1>Simple Video Call</h1>
+    <div id="roomControls">
+        <input type="text" id="roomInput" placeholder="Enter room name">
         <button onclick="joinRoom()">Join Room</button>
     </div>
     <div id="videos">
@@ -47,45 +39,10 @@
             statusDiv.scrollTop = statusDiv.scrollHeight;
         }
 
-        function scheduleConsultation() {
-            const date = document.getElementById('dateInput').value;
-            const time = document.getElementById('timeInput').value;
-            const clientEmail = document.getElementById('clientEmail').value;
-
-            if (!date || !time || !clientEmail) {
-                alert('Please fill in all fields');
-                return;
-            }
-
-            const roomCode = generateRoomCode(date, time, clientEmail);
-            const consultationLink = `${window.location.href}?room=${roomCode}`;
-
-            updateStatus(`Consultation scheduled for ${date} at ${time}`);
-            updateStatus(`Room Code: ${roomCode}`);
-            updateStatus(`Consultation Link: ${consultationLink}`);
-
-            // In a real application, you would send this link to the client's email
-            alert(`Link generated: ${consultationLink}\n\nIn a real application, this would be sent to ${clientEmail}`);
-        }
-
-        function generateRoomCode(date, time, email) {
-            const combined = `${date}-${time}-${email}`;
-            return btoa(combined).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
-        }
-
         async function joinRoom() {
-            let roomCode = document.getElementById('roomInput').value;
-            
-            // Check if room code is in URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlRoomCode = urlParams.get('room');
-            if (urlRoomCode) {
-                roomCode = urlRoomCode;
-                document.getElementById('roomInput').value = roomCode;
-            }
-
-            if (!roomCode) {
-                alert('Please enter a room code');
+            const roomName = document.getElementById('roomInput').value;
+            if (!roomName) {
+                alert('Please enter a room name');
                 return;
             }
 
@@ -94,7 +51,10 @@
                 localVideo.srcObject = stream;
                 updateStatus('Local stream acquired');
 
-                peer = new Peer(null, {
+                const roomCode = btoa(roomName).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+                updateStatus(`Room code: ${roomCode}`);
+
+                peer = new Peer(roomCode, {
                     debug: 2,
                     config: {'iceServers': [
                         { url: 'stun:stun.l.google.com:19302' },
@@ -104,7 +64,13 @@
 
                 peer.on('open', (id) => {
                     updateStatus(`Connected to PeerJS server with ID: ${id}`);
-                    connectToPeer(roomCode, stream);
+                    waitForConnection(stream);
+                });
+
+                peer.on('connection', (dataConn) => {
+                    updateStatus('Incoming peer connection');
+                    conn = dataConn;
+                    handleConnection(stream);
                 });
 
                 peer.on('call', (call) => {
@@ -118,6 +84,11 @@
 
                 peer.on('error', (error) => {
                     updateStatus(`PeerJS error: ${error}`);
+                    if (error.type === 'unavailable-id') {
+                        updateStatus('Room is occupied. Trying to join as a client.');
+                        peer.destroy();
+                        connectAsClient(roomCode, stream);
+                    }
                 });
 
             } catch (err) {
@@ -126,29 +97,13 @@
             }
         }
 
-        function connectToPeer(roomCode, stream) {
-            updateStatus(`Attempting to join room: ${roomCode}`);
-            conn = peer.connect(roomCode);
-
-            conn.on('open', () => {
-                updateStatus('Connected to peer in room');
-                const call = peer.call(roomCode, stream);
-                call.on('stream', (remoteStream) => {
-                    updateStatus('Received remote stream');
-                    remoteVideo.srcObject = remoteStream;
-                });
-            });
-
-            conn.on('error', (error) => {
-                updateStatus(`Connection error: ${error}`);
-                peer.destroy();
-                createRoom(roomCode, stream);
-            });
+        function waitForConnection(stream) {
+            updateStatus('Waiting for another peer to join...');
         }
 
-        function createRoom(roomCode, stream) {
-            updateStatus(`Creating room: ${roomCode}`);
-            peer = new Peer(roomCode, {
+        function connectAsClient(roomCode, stream) {
+            updateStatus(`Attempting to join room: ${roomCode}`);
+            peer = new Peer(null, {
                 debug: 2,
                 config: {'iceServers': [
                     { url: 'stun:stun.l.google.com:19302' },
@@ -157,33 +112,26 @@
             });
 
             peer.on('open', (id) => {
-                updateStatus(`Room created with ID: ${id}`);
-            });
-
-            peer.on('connection', (dataConn) => {
-                updateStatus('Peer joined the room');
-                conn = dataConn;
-            });
-
-            peer.on('call', (call) => {
-                updateStatus('Receiving call');
-                call.answer(stream);
-                call.on('stream', (remoteStream) => {
-                    updateStatus('Received remote stream');
-                    remoteVideo.srcObject = remoteStream;
+                updateStatus(`Connected to PeerJS server with ID: ${id}`);
+                conn = peer.connect(roomCode);
+                conn.on('open', () => {
+                    updateStatus('Connected to peer in room');
+                    handleConnection(stream);
                 });
+            });
+
+            peer.on('error', (error) => {
+                updateStatus(`Connection error: ${error}`);
             });
         }
 
-        // Check for room code in URL on page load
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomCode = urlParams.get('room');
-            if (roomCode) {
-                document.getElementById('roomInput').value = roomCode;
-                joinRoom();
-            }
-        };
+        function handleConnection(stream) {
+            const call = peer.call(conn.peer, stream);
+            call.on('stream', (remoteStream) => {
+                updateStatus('Received remote stream');
+                remoteVideo.srcObject = remoteStream;
+            });
+        }
     </script>
 </body>
 </html>
