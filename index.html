@@ -44,7 +44,7 @@
 
                 peer.on('open', (id) => {
                     console.log('My peer ID is: ' + id);
-                    connectToRoom(roomName, stream);
+                    connectToRoom(roomName, stream, id);
                 });
 
                 peer.on('call', (call) => {
@@ -65,14 +65,17 @@
             }
         }
 
-        function connectToRoom(roomName, stream) {
-            // Use the room name as the data to connect
-            conn = peer.connect(roomName);
+        function connectToRoom(roomName, stream, myPeerId) {
+            // Use a consistent method to generate a "room code" from the room name
+            const roomCode = btoa(roomName).slice(0, 20);
+
+            // Try to connect to an existing peer in the room
+            conn = peer.connect(roomCode);
 
             conn.on('open', () => {
                 console.log('Connected to peer in room');
                 // We're connected, so let's call them
-                const call = peer.call(roomName, stream);
+                const call = peer.call(roomCode, stream);
                 call.on('stream', (remoteStream) => {
                     remoteVideo.srcObject = remoteStream;
                 });
@@ -81,8 +84,8 @@
             conn.on('error', (error) => {
                 console.log('Connection error:', error);
                 // If connection fails, it might be because we're the first one in the room
-                // In this case, we'll wait for others to connect to us
-                peer.id = roomName;
+                // In this case, we'll set our peer ID to the room code and wait for others
+                peer.id = roomCode;
             });
         }
     </script>
