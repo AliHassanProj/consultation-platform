@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consultation Platform</title>
-    <script src='https://meet.jit.si/external_api.js'></script>
     <style>
         body {
             display: flex;
@@ -18,32 +17,18 @@
             background-color: #f0f0f0;
             font-family: Arial, sans-serif;
         }
-        #jitsi-meet {
+        #localVideo, #remoteVideo {
             width: 100%;
             max-width: 800px;
-            height: 600px;
+            height: 400px;
+            background-color: black;
             margin-top: 20px;
-        }
-        #clientList {
-            margin-top: 20px;
-            width: 100%;
-            max-width: 600px;
         }
         input, button, textarea {
             margin: 5px;
             padding: 10px;
             width: 100%;
             max-width: 300px;
-        }
-        textarea {
-            height: 100px;
-        }
-        .client-item {
-            background-color: #ffffff;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
         }
     </style>
 </head>
@@ -55,107 +40,67 @@
     <input type="text" id="displayName" placeholder="Enter your display name" />
     <button id="joinButton">Join Call</button>
     
-    <h2>Manage Clients</h2>
-    <input type="text" id="clientName" placeholder="Client Name" />
-    <textarea id="sessionNotes" placeholder="Session Notes"></textarea>
-    <button id="saveClient">Save Client</button>
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
     
-    <div id="clientList"></div>
-    <div id="jitsi-meet"></div>
-
     <script>
-        // Join a video call
-        document.getElementById('joinButton').onclick = function() {
+        let localStream, remoteStream, peerConnection;
+        const servers = {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
+        // Access the user's webcam and microphone
+        async function startLocalStream() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+            } catch (err) {
+                console.error('Error accessing media devices:', err);
+            }
+        }
+
+        // Set up WebRTC peer connection
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(servers);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Send the ICE candidate to the signaling server
+                    console.log('New ICE candidate', event.candidate);
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                remoteStream = event.streams[0];
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            };
+
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        }
+
+        // Join call button click event
+        document.getElementById('joinButton').onclick = async function() {
             const roomName = document.getElementById('roomInput').value.trim();
-            const displayName = document.getElementById('displayName').value.trim();
             if (!roomName) {
                 alert('Please enter a room name.');
                 return;
             }
-            if (!displayName) {
-                alert('Please enter your display name.');
-                return;
-            }
+            
+            // Set up local video stream
+            await startLocalStream();
+            createPeerConnection();
 
-            const domain = 'meet.jit.si';
-            const options = {
-                roomName: roomName,
-                width: '100%',
-                height: '100%',
-                parentNode: document.getElementById('jitsi-meet'),
-                configOverwrite: {
-                    startWithAudioMuted: true,
-                    startWithVideoMuted: true,
-                    prejoinPageEnabled: false,
-                    disableDeepLinking: true
-                },
-                interfaceConfigOverwrite: {
-                    TOOLBAR_BUTTONS: [
-                        'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-                        'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
-                        'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
-                        'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
-                        'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
-                        'e2ee'
-                    ],
-                    SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar'],
-                    SHOW_JITSI_WATERMARK: false,
-                },
-                userInfo: {
-                    displayName: displayName
-                }
-            };
+            // Simulate signaling exchange (replace this with actual signaling)
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            // Normally, you'd send the offer to the other peer via signaling server
+            console.log('Offer sent', offer);
 
-            const api = new JitsiMeetExternalAPI(domain, options);
-
-            // Listen for videoConferenceJoined event
-            api.addEventListener('videoConferenceJoined', () => {
-                // Make the local participant a moderator
-                api.executeCommand('setRole', 'moderator');
-            });
+            // Here, you'd receive the remote answer from signaling server
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
         };
-
-        // Save client data
-        document.getElementById('saveClient').onclick = function() {
-            const clientName = document.getElementById('clientName').value.trim();
-            const sessionNotes = document.getElementById('sessionNotes').value.trim();
-
-            if (!clientName || !sessionNotes) {
-                alert('Please enter both client name and session notes.');
-                return;
-            }
-
-            // Get existing clients from local storage
-            let clients = JSON.parse(localStorage.getItem('clients')) || [];
-            clients.push({ name: clientName, notes: sessionNotes, date: new Date().toISOString() });
-            localStorage.setItem('clients', JSON.stringify(clients));
-
-            // Update client list
-            displayClients();
-            document.getElementById('clientName').value = '';
-            document.getElementById('sessionNotes').value = '';
-        };
-
-        // Display clients
-        function displayClients() {
-            const clients = JSON.parse(localStorage.getItem('clients')) || [];
-            const clientList = document.getElementById('clientList');
-            clientList.innerHTML = '';
-
-            clients.forEach((client, index) => {
-                const clientItem = document.createElement('div');
-                clientItem.className = 'client-item';
-                clientItem.innerHTML = `
-                    <strong>${client.name}</strong><br>
-                    <em>${new Date(client.date).toLocaleString()}</em><br>
-                    ${client.notes}
-                `;
-                clientList.appendChild(clientItem);
-            });
-        }
-
-        // Initial display of clients
-        displayClients();
     </script>
 </body>
 </html>
