@@ -36,45 +36,54 @@
                 return;
             }
 
-            peer = new Peer(roomName);
-
-            peer.on('open', (id) => {
-                console.log('My peer ID is: ' + id);
-                setupLocalStream();
-            });
-
-            peer.on('call', (call) => {
-                navigator.mediaDevices.getUserMedia({video: true, audio: true})
-                    .then((stream) => {
-                        call.answer(stream);
-                        call.on('stream', (remoteStream) => {
-                            remoteVideo.srcObject = remoteStream;
-                        });
-                    })
-                    .catch((err) => {
-                        console.error('Failed to get local stream', err);
-                    });
-            });
-        }
-
-        async function setupLocalStream() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
                 localVideo.srcObject = stream;
-                connectToPeer(stream);
+
+                peer = new Peer();
+
+                peer.on('open', (id) => {
+                    console.log('My peer ID is: ' + id);
+                    connectToRoom(roomName, stream);
+                });
+
+                peer.on('call', (call) => {
+                    call.answer(stream);
+                    call.on('stream', (remoteStream) => {
+                        remoteVideo.srcObject = remoteStream;
+                    });
+                });
+
+                peer.on('error', (error) => {
+                    console.error('PeerJS error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+
             } catch (err) {
                 console.error('Failed to get local stream', err);
+                alert('Could not access camera and microphone. Please ensure they are connected and permissions are granted.');
             }
         }
 
-        function connectToPeer(stream) {
-            const remotePeerId = prompt("Enter the peer ID to call:");
-            if (remotePeerId) {
-                const call = peer.call(remotePeerId, stream);
+        function connectToRoom(roomName, stream) {
+            // Use the room name as the data to connect
+            conn = peer.connect(roomName);
+
+            conn.on('open', () => {
+                console.log('Connected to peer in room');
+                // We're connected, so let's call them
+                const call = peer.call(roomName, stream);
                 call.on('stream', (remoteStream) => {
                     remoteVideo.srcObject = remoteStream;
                 });
-            }
+            });
+
+            conn.on('error', (error) => {
+                console.log('Connection error:', error);
+                // If connection fails, it might be because we're the first one in the room
+                // In this case, we'll wait for others to connect to us
+                peer.id = roomName;
+            });
         }
     </script>
 </body>
