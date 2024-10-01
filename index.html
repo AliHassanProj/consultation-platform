@@ -46,6 +46,8 @@
     <script>
         let localStream, remoteStream, peerConnection;
         let socket;
+        let roomName, displayName;
+        let isInitiator = false;
         const servers = {
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         };
@@ -56,17 +58,25 @@
             
             socket.onopen = () => {
                 console.log('Connected to WebSocket server');
+                joinRoom();
             };
             
             socket.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
                 
-                if (message.type === 'offer') {
-                    await handleOffer(message);
-                } else if (message.type === 'answer') {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
-                } else if (message.type === 'ice-candidate') {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                switch(message.type) {
+                    case 'room_joined':
+                        handleRoomJoined(message);
+                        break;
+                    case 'offer':
+                        await handleOffer(message);
+                        break;
+                    case 'answer':
+                        await handleAnswer(message);
+                        break;
+                    case 'ice-candidate':
+                        await handleIceCandidate(message);
+                        break;
                 }
             };
             
@@ -77,6 +87,20 @@
             socket.onclose = () => {
                 console.log('Disconnected from WebSocket server');
             };
+        }
+
+        function joinRoom() {
+            socket.send(JSON.stringify({
+                type: 'join',
+                room: roomName,
+                displayName: displayName
+            }));
+        }
+
+        async function handleRoomJoined(message) {
+            console.log('Room joined', message);
+            isInitiator = message.isInitiator;
+            await startCall();
         }
 
         // Access the user's webcam and microphone
@@ -97,7 +121,8 @@
                 if (event.candidate) {
                     socket.send(JSON.stringify({
                         type: 'ice-candidate',
-                        candidate: event.candidate
+                        candidate: event.candidate,
+                        room: roomName
                     }));
                 }
             };
@@ -108,6 +133,25 @@
             };
             
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        }
+
+        async function startCall() {
+            await startLocalStream();
+            createPeerConnection();
+
+            if (isInitiator) {
+                try {
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    socket.send(JSON.stringify({
+                        type: 'offer',
+                        offer: offer,
+                        room: roomName
+                    }));
+                } catch (error) {
+                    console.error('Error creating offer:', error);
+                }
+            }
         }
 
         // Handle incoming offer
@@ -123,14 +167,29 @@
             
             socket.send(JSON.stringify({
                 type: 'answer',
-                answer: answer
+                answer: answer,
+                room: roomName
             }));
         }
 
+        // Handle incoming answer
+        async function handleAnswer(message) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+        }
+
+        // Handle incoming ICE candidate
+        async function handleIceCandidate(message) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+
         // Join call button click event
-        document.getElementById('joinButton').onclick = async function() {
-            const roomName = document.getElementById('roomInput').value.trim();
-            const displayName = document.getElementById('displayName').value.trim();
+        document.getElementById('joinButton').onclick = function() {
+            roomName = document.getElementById('roomInput').value.trim();
+            displayName = document.getElementById('displayName').value.trim();
             
             if (!roomName || !displayName) {
                 alert('Please enter both room name and display name.');
@@ -138,21 +197,6 @@
             }
             
             connectWebSocket();
-            
-            // Set up local video stream
-            await startLocalStream();
-            createPeerConnection();
-            
-            // Create and send offer
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            
-            socket.send(JSON.stringify({
-                type: 'offer',
-                offer: offer,
-                room: roomName,
-                displayName: displayName
-            }));
         };
     </script>
 </body>
