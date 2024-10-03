@@ -45,9 +45,15 @@
             margin-bottom: 10px;
             border-radius: 5px;
         }
+        .navigation {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
+    <div class="navigation">
+        <a href="generate-link.html">Generate Video Call Link</a>
+    </div>
     <h1>Consultation Platform</h1>
     
     <h2>Join a Video Call</h2>
@@ -64,6 +70,16 @@
     <div id="jitsi-meet"></div>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomParam = urlParams.get('room');
+        const clientParam = urlParams.get('client');
+
+        if (roomParam) {
+            document.getElementById('roomInput').value = roomParam;
+        }
+        if (clientParam) {
+            document.getElementById('displayName').value = clientParam;
+        }
         // Join a video call
         document.getElementById('joinButton').onclick = function() {
             const roomName = document.getElementById('roomInput').value.trim();
