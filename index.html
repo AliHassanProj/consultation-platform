@@ -83,19 +83,22 @@
 <body>
     <div class="container">
         <h1>Consultation Platform</h1>
+
+        <div id="scheduledMeetingInfo"></div>
         
-        <button id="openModal">Generate Video Call Link</button>
-        
-        <div id="callInfo"></div>
-        
-        <div id="joinCall">
-            <h2>Join or Start a Video Call</h2>
-            <input type="text" id="roomInput" placeholder="Enter room name" />
-            <input type="text" id="displayName" placeholder="Enter your display name" />
-            <button id="joinButton">Join/Start Call</button>
+        <div id="generateLinkSection">
+            <button id="openModal">Generate Video Call Link</button>
+            
+            <div id="joinCall">
+                <h2>Join or Start a Video Call</h2>
+                <input type="text" id="roomInput" placeholder="Enter room name" />
+                <input type="text" id="displayName" placeholder="Enter your display name" />
+                <button id="joinButton">Join/Start Call</button>
+            </div>
         </div>
         
         <div id="jitsi-meet"></div>
+        <div id="callInfo"></div>
     </div>
 
     <!-- Modal for generating link -->
@@ -172,13 +175,17 @@
         const dateParam = urlParams.get('date');
         const timeParam = urlParams.get('time');
 
-        const callInfoDiv = document.getElementById('callInfo');
+        const scheduledMeetingInfoDiv = document.getElementById('scheduledMeetingInfo');
+        const generateLinkSection = document.getElementById('generateLinkSection');
 
         if (roomParam && clientParam && dateParam && timeParam) {
+            // Hide the generate link section
+            generateLinkSection.style.display = 'none';
+
             const callDateTime = new Date(dateParam + 'T' + timeParam);
             const now = new Date();
             
-            callInfoDiv.innerHTML = `
+            scheduledMeetingInfoDiv.innerHTML = `
                 <h2>Scheduled Call</h2>
                 <p>Client: ${clientParam}</p>
                 <p>Date: ${callDateTime.toLocaleDateString('da-DK')}</p>
@@ -186,18 +193,23 @@
             `;
 
             if (now >= callDateTime && now < new Date(callDateTime.getTime() + 30*60000)) {
-                document.getElementById('roomInput').value = roomParam;
-                document.getElementById('displayName').value = clientParam;
+                scheduledMeetingInfoDiv.innerHTML += `
+                    <button id="joinScheduledCall">Join Scheduled Call</button>
+                `;
+                document.getElementById('joinScheduledCall').onclick = function() {
+                    startJitsiMeet(roomParam, clientParam);
+                };
             } else if (now < callDateTime) {
-                callInfoDiv.innerHTML += `<p>The call will be available to join at the scheduled time.</p>`;
+                scheduledMeetingInfoDiv.innerHTML += `<p>The call will be available to join at the scheduled time.</p>`;
             } else {
-                callInfoDiv.innerHTML += `<p>This call has already ended.</p>`;
+                scheduledMeetingInfoDiv.innerHTML += `<p>This call has already ended.</p>`;
             }
         } else {
-            callInfoDiv.innerHTML = `<p>No scheduled call information available. You can start or join an instant call below.</p>`;
+            // Show the generate link section if there are no URL parameters
+            generateLinkSection.style.display = 'block';
         }
 
-        // Join or start a video call
+        // Join or start a video call (keep as is)
         document.getElementById('joinButton').onclick = function() {
             const roomName = document.getElementById('roomInput').value.trim();
             const displayName = document.getElementById('displayName').value.trim();
