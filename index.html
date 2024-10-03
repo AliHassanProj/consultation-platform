@@ -88,11 +88,11 @@
         
         <div id="callInfo"></div>
         
-        <div id="joinCall" style="display:none;">
-            <h2>Join a Video Call</h2>
-            <input type="text" id="roomInput" placeholder="Enter room name"  />
+        <div id="joinCall">
+            <h2>Join or Start a Video Call</h2>
+            <input type="text" id="roomInput" placeholder="Enter room name" />
             <input type="text" id="displayName" placeholder="Enter your display name" />
-            <button id="joinButton">Join Call</button>
+            <button id="joinButton">Join/Start Call</button>
         </div>
         
         <div id="jitsi-meet"></div>
@@ -173,7 +173,6 @@
         const timeParam = urlParams.get('time');
 
         const callInfoDiv = document.getElementById('callInfo');
-        const joinCallDiv = document.getElementById('joinCall');
 
         if (roomParam && clientParam && dateParam && timeParam) {
             const callDateTime = new Date(dateParam + 'T' + timeParam);
@@ -189,18 +188,16 @@
             if (now >= callDateTime && now < new Date(callDateTime.getTime() + 30*60000)) {
                 document.getElementById('roomInput').value = roomParam;
                 document.getElementById('displayName').value = clientParam;
-                joinCallDiv.style.display = 'block';
             } else if (now < callDateTime) {
                 callInfoDiv.innerHTML += `<p>The call will be available to join at the scheduled time.</p>`;
             } else {
                 callInfoDiv.innerHTML += `<p>This call has already ended.</p>`;
             }
         } else {
-            callInfoDiv.innerHTML = `<p>No scheduled call information available.</p>`;
-            joinCallDiv.style.display = 'block';
+            callInfoDiv.innerHTML = `<p>No scheduled call information available. You can start or join an instant call below.</p>`;
         }
 
-        // Join a video call
+        // Join or start a video call
         document.getElementById('joinButton').onclick = function() {
             const roomName = document.getElementById('roomInput').value.trim();
             const displayName = document.getElementById('displayName').value.trim();
@@ -209,6 +206,10 @@
                 return;
             }
 
+            startJitsiMeet(roomName, displayName);
+        };
+
+        function startJitsiMeet(roomName, displayName) {
             const domain = 'meet.jit.si';
             const options = {
                 roomName: roomName,
@@ -243,7 +244,7 @@
             api.addEventListener('videoConferenceJoined', () => {
                 api.executeCommand('setRole', 'moderator');
             });
-        };
+        }
     </script>
 </body>
 </html>
