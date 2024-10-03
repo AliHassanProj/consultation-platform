@@ -73,11 +73,12 @@
             const callDate = document.getElementById('callDate').value;
             const callTime = document.getElementById('callTime').value;
 
-            // Generate a unique room name (you might want to use a more sophisticated method)
+            // Generate a unique room name
             const roomName = `${clientName.replace(/\s+/g, '-')}-${Date.now()}`;
 
-            // Create the link
-            const link = `${window.location.origin}/index.html?room=${encodeURIComponent(roomName)}&client=${encodeURIComponent(clientName)}`;
+            // Create the link with date and time
+            const baseUrl = window.location.origin + "/index.html"; // Update this if needed
+            const link = `${baseUrl}?room=${encodeURIComponent(roomName)}&client=${encodeURIComponent(clientName)}&date=${encodeURIComponent(callDate)}&time=${encodeURIComponent(callTime)}`;
 
             // Display the generated link
             const linkDisplay = document.getElementById('generatedLink');
@@ -90,7 +91,7 @@
                 Time: ${callTime}
             `;
 
-            // Optionally, save the call details
+            // Save the call details
             saveCallDetails(clientName, callDate, callTime, roomName);
         });
 
