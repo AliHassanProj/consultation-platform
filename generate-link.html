@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Video Call Link - Consultation Platform</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #generatedLink {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 5px;
+            word-break: break-all;
+        }
+        .navigation {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation">
+        <a href="index.html">Back to Main Page</a>
+    </div>
+    <h1>Generate Video Call Link</h1>
+    <form id="linkForm">
+        <input type="text" id="clientName" placeholder="Client Name" required>
+        <input type="date" id="callDate" required>
+        <input type="time" id="callTime" required>
+        <button type="submit">Generate Link</button>
+    </form>
+    <div id="generatedLink"></div>
+
+    <script>
+        document.getElementById('linkForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clientName = document.getElementById('clientName').value.trim();
+            const callDate = document.getElementById('callDate').value;
+            const callTime = document.getElementById('callTime').value;
+
+            // Generate a unique room name (you might want to use a more sophisticated method)
+            const roomName = `${clientName.replace(/\s+/g, '-')}-${Date.now()}`;
+
+            // Create the link
+            const link = `${window.location.origin}/index.html?room=${encodeURIComponent(roomName)}&client=${encodeURIComponent(clientName)}`;
+
+            // Display the generated link
+            const linkDisplay = document.getElementById('generatedLink');
+            linkDisplay.innerHTML = `
+                <strong>Generated Link:</strong><br>
+                <a href="${link}" target="_blank">${link}</a><br><br>
+                <strong>Call Details:</strong><br>
+                Client: ${clientName}<br>
+                Date: ${new Date(callDate).toLocaleDateString('da-DK')}<br>
+                Time: ${callTime}
+            `;
+
+            // Optionally, save the call details
+            saveCallDetails(clientName, callDate, callTime, roomName);
+        });
+
+        function saveCallDetails(clientName, date, time, roomName) {
+            let calls = JSON.parse(localStorage.getItem('scheduledCalls')) || [];
+            calls.push({ clientName, date, time, roomName });
+            localStorage.setItem('scheduledCalls', JSON.stringify(calls));
+        }
+    </script>
+</body>
+</html>
