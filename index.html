@@ -7,73 +7,164 @@
     <script src='https://meet.jit.si/external_api.js'></script>
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
             margin: 0;
             padding: 20px;
-            box-sizing: border-box;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        input, button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
         }
         #jitsi-meet {
-            width: 100%;
-            max-width: 800px;
             height: 600px;
             margin-top: 20px;
         }
-        #clientList {
-            margin-top: 20px;
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
             width: 100%;
-            max-width: 600px;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
         }
-        input, button, textarea {
-            margin: 5px;
-            padding: 10px;
-            width: 100%;
-            max-width: 300px;
-        }
-        textarea {
-            height: 100px;
-        }
-        .client-item {
-            background-color: #ffffff;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
             border-radius: 5px;
         }
-        .navigation {
-            margin-bottom: 20px;
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="navigation">
-        <a href="generate-link.html">Generate Video Call Link</a>
+    <div class="container">
+        <h1>Consultation Platform</h1>
+        
+        <button id="openModal">Generate Video Call Link</button>
+        
+        <div id="callInfo"></div>
+        
+        <div id="joinCall" style="display:none;">
+            <h2>Join a Video Call</h2>
+            <input type="text" id="roomInput" placeholder="Enter room name" readonly />
+            <input type="text" id="displayName" placeholder="Enter your display name" />
+            <button id="joinButton">Join Call</button>
+        </div>
+        
+        <div id="jitsi-meet"></div>
     </div>
-    <h1>Consultation Platform</h1>
-    
-    <div id="callInfo"></div>
-    
-    <div id="joinCall" style="display:none;">
-        <h2>Join a Video Call</h2>
-        <input type="text" id="roomInput" placeholder="Enter room name" readonly />
-        <input type="text" id="displayName" placeholder="Enter your display name" />
-        <button id="joinButton">Join Call</button>
+
+    <!-- Modal for generating link -->
+    <div id="linkModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Generate Video Call Link</h2>
+            <form id="linkForm">
+                <input type="text" id="clientName" placeholder="Client Name" required>
+                <input type="date" id="callDate" required>
+                <input type="time" id="callTime" required>
+                <button type="submit">Generate Link</button>
+            </form>
+            <div id="generatedLink"></div>
+        </div>
     </div>
-    
-    <h2>Manage Clients</h2>
-    <input type="text" id="clientName" placeholder="Client Name" />
-    <textarea id="sessionNotes" placeholder="Session Notes"></textarea>
-    <button id="saveClient">Save Client</button>
-    
-    <div id="clientList"></div>
-    <div id="jitsi-meet"></div>
 
     <script>
+        // Modal functionality
+        const modal = document.getElementById("linkModal");
+        const btn = document.getElementById("openModal");
+        const span = document.getElementsByClassName("close")[0];
+
+        btn.onclick = function() {
+            modal.style.display = "block";
+        }
+
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        // Generate link functionality
+        document.getElementById('linkForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clientName = document.getElementById('clientName').value.trim();
+            const callDate = document.getElementById('callDate').value;
+            const callTime = document.getElementById('callTime').value;
+
+            const roomName = `${clientName.replace(/\s+/g, '-')}-${Date.now()}`;
+
+            const baseUrl = window.location.href.split('?')[0]; // Get the current URL without query parameters
+            const link = `${baseUrl}?room=${encodeURIComponent(roomName)}&client=${encodeURIComponent(clientName)}&date=${encodeURIComponent(callDate)}&time=${encodeURIComponent(callTime)}`;
+
+            const linkDisplay = document.getElementById('generatedLink');
+            linkDisplay.innerHTML = `
+                <strong>Generated Link:</strong><br>
+                <a href="${link}" target="_blank">${link}</a><br><br>
+                <strong>Call Details:</strong><br>
+                Client: ${clientName}<br>
+                Date: ${new Date(callDate).toLocaleDateString('da-DK')}<br>
+                Time: ${callTime}
+            `;
+
+            saveCallDetails(clientName, callDate, callTime, roomName);
+        });
+
+        function saveCallDetails(clientName, date, time, roomName) {
+            let calls = JSON.parse(localStorage.getItem('scheduledCalls')) || [];
+            calls.push({ clientName, date, time, roomName });
+            localStorage.setItem('scheduledCalls', JSON.stringify(calls));
+        }
+
         // Check for parameters in URL
         const urlParams = new URLSearchParams(window.location.search);
         const roomParam = urlParams.get('room');
@@ -95,7 +186,7 @@
                 <p>Time: ${timeParam}</p>
             `;
 
-            if (now >= callDateTime && now < new Date(callDateTime.getTime() + 30*60000)) { // Within 30 minutes of start time
+            if (now >= callDateTime && now < new Date(callDateTime.getTime() + 30*60000)) {
                 document.getElementById('roomInput').value = roomParam;
                 document.getElementById('displayName').value = clientParam;
                 joinCallDiv.style.display = 'block';
@@ -149,54 +240,10 @@
 
             const api = new JitsiMeetExternalAPI(domain, options);
 
-            // Listen for videoConferenceJoined event
             api.addEventListener('videoConferenceJoined', () => {
-                // Make the local participant a moderator
                 api.executeCommand('setRole', 'moderator');
             });
         };
-
-        // Save client data
-        document.getElementById('saveClient').onclick = function() {
-            const clientName = document.getElementById('clientName').value.trim();
-            const sessionNotes = document.getElementById('sessionNotes').value.trim();
-
-            if (!clientName || !sessionNotes) {
-                alert('Please enter both client name and session notes.');
-                return;
-            }
-
-            // Get existing clients from local storage
-            let clients = JSON.parse(localStorage.getItem('clients')) || [];
-            clients.push({ name: clientName, notes: sessionNotes, date: new Date().toISOString() });
-            localStorage.setItem('clients', JSON.stringify(clients));
-
-            // Update client list
-            displayClients();
-            document.getElementById('clientName').value = '';
-            document.getElementById('sessionNotes').value = '';
-        };
-
-        // Display clients
-        function displayClients() {
-            const clients = JSON.parse(localStorage.getItem('clients')) || [];
-            const clientList = document.getElementById('clientList');
-            clientList.innerHTML = '';
-
-            clients.forEach((client, index) => {
-                const clientItem = document.createElement('div');
-                clientItem.className = 'client-item';
-                clientItem.innerHTML = `
-                    <strong>${client.name}</strong><br>
-                    <em>${new Date(client.date).toLocaleString()}</em><br>
-                    ${client.notes}
-                `;
-                clientList.appendChild(clientItem);
-            });
-        }
-
-        // Initial display of clients
-        displayClients();
     </script>
 </body>
 </html>
